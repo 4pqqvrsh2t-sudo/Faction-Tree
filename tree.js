@@ -1,55 +1,124 @@
-const data = {
-  name: "Federation",
-  children: [
-    { name: "Faction A", children: [{ name: "Faction A1" }, { name: "Faction A2" }] },
-    { name: "Faction B", children: [{ name: "Faction B1" }, { name: "Faction B2" }] }
-  ]
-};
-
-// Tree dimensions
+// Collapsible glowing orb faction tree using D3.js
 const width = window.innerWidth;
 const height = window.innerHeight;
 
 const svg = d3.select("#tree-container")
-  .append("svg")
-  .attr("width", width)
-  .attr("height", height)
-  .append("g")
-  .attr("transform", "translate(50,50)");
+    .append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+const g = svg.append("g")
+    .attr("transform", `translate(${width/2}, ${50})`);
+
+// Example hierarchical data
+const data = {
+    name: "Federation",
+    children: [
+        { name: "Faction A", children: [
+            { name: "Faction A1" },
+            { name: "Faction A2" }
+        ] },
+        { name: "Faction B" },
+        { name: "Faction C", children: [
+            { name: "Faction C1" }
+        ] }
+    ]
+};
 
 const root = d3.hierarchy(data);
-const treeLayout = d3.tree().size([width - 100, height - 100]);
-treeLayout(root);
+root.x0 = height / 2;
+root.y0 = 0;
 
-// Draw links
-svg.selectAll('line')
-  .data(root.links())
-  .enter()
-  .append('line')
-  .attr('x1', d => d.source.x)
-  .attr('y1', d => d.source.y)
-  .attr('x2', d => d.target.x)
-  .attr('y2', d => d.target.y)
-  .attr('stroke', 'white');
+// Collapse all children initially
+root.children.forEach(collapse);
 
-// Draw nodes
-svg.selectAll('circle')
-  .data(root.descendants())
-  .enter()
-  .append('circle')
-  .attr('cx', d => d.x)
-  .attr('cy', d => d.y)
-  .attr('r', 20)
-  .attr('fill', 'orange')
-  .on('click', d => alert(`You clicked ${d.data.name}`));
+const treeLayout = d3.tree().size([height - 200, width - 200]);
+update(root);
 
-// Add labels
-svg.selectAll('text')
-  .data(root.descendants())
-  .enter()
-  .append('text')
-  .attr('x', d => d.x)
-  .attr('y', d => d.y - 25)
-  .attr('text-anchor', 'middle')
-  .attr('fill', 'white')
-  .text(d => d.data.name);
+function collapse(d) {
+    if(d.children) {
+        d._children = d.children;
+        d._children.forEach(collapse);
+        d.children = null;
+    }
+}
+
+function update(source) {
+    const treeData = treeLayout(root);
+    const nodes = treeData.descendants();
+    const links = treeData.links();
+
+    // Nodes
+    const node = g.selectAll(".node")
+        .data(nodes, d => d.data.name);
+
+    const nodeEnter = node.enter().append("g")
+        .attr("class", "node")
+        .attr("transform", d => `translate(${source.y0},${source.x0})`)
+        .on("click", click);
+
+    // Glowing orb for Federation
+    nodeEnter.append("circle")
+        .attr("r", d => d.depth === 0 ? 20 : 10)
+        .style("fill", d => d.depth === 0 ? "orange" : "#fff")
+        .style("stroke", "#f90")
+        .style("stroke-width", d => d.depth === 0 ? 4 : 2)
+        .style("filter", d => d.depth === 0 ? "url(#glow)" : "none");
+
+    nodeEnter.append("text")
+        .attr("dy", ".35em")
+        .attr("x", d => d.children || d._children ? -12 : 12)
+        .attr("text-anchor", d => d.children || d._children ? "end" : "start")
+        .text(d => d.data.name)
+        .style("fill", "#fff");
+
+    // Add glow filter
+    const defs = svg.append("defs");
+    const filter = defs.append("filter").attr("id","glow");
+    filter.append("feGaussianBlur").attr("stdDeviation","4").attr("result","coloredBlur");
+    const feMerge = filter.append("feMerge");
+    feMerge.append("feMergeNode").attr("in","coloredBlur");
+    feMerge.append("feMergeNode").attr("in","SourceGraphic");
+
+    // Links
+    const link = g.selectAll(".link")
+        .data(links, d => d.target.data.name);
+
+    link.enter().insert("path", "g")
+        .attr("class", "link")
+        .attr("fill", "none")
+        .attr("stroke", "#888")
+        .attr("stroke-width", 2)
+        .attr("d", d => {
+            const o = {x: source.x0, y: source.y0};
+            return diagonal(o, o);
+        });
+
+    // Transition nodes and links
+    const t = d3.transition().duration(500);
+
+    node.merge(nodeEnter).transition(t)
+        .attr("transform", d => `translate(${d.y},${d.x})`);
+
+    link.merge(link.enter()).transition(t)
+        .attr("d", d => diagonal(d.source, d.target));
+
+    // Store old positions
+    nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
+}
+
+function diagonal(s, d) {
+    return `M ${s.y} ${s.x} C ${(s.y + d.y) / 2} ${s.x}, ${(s.y + d.y) / 2} ${d.x}, ${d.y} ${d.x}`;
+}
+
+// Toggle children on click
+function click(event, d) {
+    if(d.children) {
+        d._children = d.children;
+        d.children = null;
+    } else {
+        d.children = d._children;
+        d._children = null;
+    }
+    update(d);
+}
