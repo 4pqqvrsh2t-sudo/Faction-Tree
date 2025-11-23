@@ -1,18 +1,17 @@
-// Mobile-friendly, smooth, pulsing glowing orb faction tree
-
+// Vertical, mobile-friendly, auto-centered Federation orb tree
 const container = document.getElementById("tree-container");
 
 let width = container.clientWidth;
 let height = container.clientHeight;
 
-// Node size function based on screen width
+// Node size based on screen width
 function getNodeRadius(depth) {
-    if (width < 500) return depth === 0 ? 15 : 7;
-    if (width < 800) return depth === 0 ? 20 : 10;
+    if (width < 400) return depth === 0 ? 12 : 6;
+    if (width < 700) return depth === 0 ? 18 : 9;
     return depth === 0 ? 25 : 12;
 }
 
-// Create SVG
+// SVG container
 const svg = d3.select("#tree-container")
     .append("svg")
     .attr("width", "100%")
@@ -38,15 +37,20 @@ const data = {
 };
 
 const root = d3.hierarchy(data);
-root.x0 = height / 2;
+root.x0 = width / 2;
 root.y0 = 0;
 
+// Collapse all children initially
 root.children.forEach(collapse);
 
-const treeLayout = d3.tree().size([height - 150, width - 150]);
-update(root);
+const treeLayout = d3.tree().size([width - 100, height - 150]);
 
-// Collapse helper
+// Center the Federation orb at top
+g.attr("transform", `translate(${width / 2}, 50)`);
+
+// Expand the root on load
+update(root, true);
+
 function collapse(d) {
     if (d.children) {
         d._children = d.children;
@@ -55,8 +59,7 @@ function collapse(d) {
     }
 }
 
-// Update function
-function update(source) {
+function update(source, initial=false) {
     const treeData = treeLayout(root);
     const nodes = treeData.descendants();
     const links = treeData.links();
@@ -66,11 +69,10 @@ function update(source) {
 
     const nodeEnter = node.enter().append("g")
         .attr("class", "node")
-        .attr("transform", d => `translate(${source.y0},${source.x0})`)
+        .attr("transform", d => initial ? `translate(${source.x0},${source.y0})` : `translate(${d.x0},${d.y0})`)
         .on("click", click);
 
-    // Circles
-    const circles = nodeEnter.append("circle")
+    nodeEnter.append("circle")
         .attr("r", 0)
         .style("fill", d => d.depth === 0 ? "orange" : "#fff")
         .style("stroke", "#f90")
@@ -79,7 +81,6 @@ function update(source) {
         .transition().duration(800)
         .attr("r", d => getNodeRadius(d.depth));
 
-    // Text
     nodeEnter.append("text")
         .attr("dy", ".35em")
         .attr("x", d => d.children || d._children ? -12 : 12)
@@ -110,7 +111,7 @@ function update(source) {
         .attr("stroke", "#888")
         .attr("stroke-width", 2)
         .attr("d", d => {
-            const o = { x: source.x0, y: source.y0 };
+            const o = initial ? { x: source.x0, y: source.y0 } : { x: d.source.x0, y: d.source.y0 };
             return diagonal(o, o);
         })
         .transition().duration(800)
@@ -119,14 +120,14 @@ function update(source) {
     const t = d3.transition().duration(800);
 
     node.merge(nodeEnter).transition(t)
-        .attr("transform", d => `translate(${d.y},${d.x})`);
+        .attr("transform", d => `translate(${d.x},${d.y})`);
 
     link.merge(link.enter()).transition(t)
         .attr("d", d => diagonal(d.source, d.target));
 
     nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
 
-    // PULSING GLOW for Federation orb
+    // Pulsing glow for Federation orb
     svg.selectAll("circle").filter(d => d && d.depth === 0)
         .transition().duration(1000)
         .attrTween("r", function(d) {
@@ -134,7 +135,6 @@ function update(source) {
             return t => r + 3 * Math.sin(t * Math.PI * 2);
         })
         .on("end", () => {
-            // repeat pulse
             svg.selectAll("circle").filter(d => d && d.depth === 0)
                 .call(d => d.transition().duration(1000).attrTween("r", function(d) {
                     const r = getNodeRadius(d.depth);
@@ -143,23 +143,21 @@ function update(source) {
         });
 }
 
-// Diagonal path helper
 function diagonal(s, d) {
-    return `M ${s.y} ${s.x} C ${(s.y + d.y)/2} ${s.x}, ${(s.y + d.y)/2} ${d.x}, ${d.y} ${d.x}`;
+    return `M ${s.x} ${s.y} C ${s.x} ${(s.y + d.y)/2}, ${d.x} ${(s.y + d.y)/2}, ${d.x} ${d.y}`;
 }
 
-// Click handler
 function click(event, d) {
     if(d.children) { d._children = d.children; d.children = null; }
     else { d.children = d._children; d._children = null; }
     update(d);
 }
 
-// Resize handler
+// Responsive resize
 window.addEventListener("resize", () => {
     width = container.clientWidth;
     height = container.clientHeight;
     svg.attr("viewBox", `0 0 ${width} ${height}`);
-    treeLayout.size([height - 150, width - 150]);
+    treeLayout.size([width - 100, height - 150]);
     update(root);
 });
