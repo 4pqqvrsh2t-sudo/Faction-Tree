@@ -11,7 +11,7 @@ const svg = d3.select("#tree-container")
     .attr("viewBox", `0 0 ${width} ${height}`)
     .attr("preserveAspectRatio", "xMidYMid meet")
     .call(d3.zoom()
-        .scaleExtent([0.5, 3])
+        .scaleExtent([width < 500 ? 0.8 : 0.5, 3]) // limited zoom for phones
         .on("zoom", (event) => g.attr("transform", event.transform))
     );
 
@@ -69,7 +69,7 @@ function update(source) {
     const maxDepth = root.height + 1;
     const maxChildren = getMaxChildren(root);
     const horizontalSpacing = Math.min(150, width / (maxChildren + 1));
-    const verticalSpacing = (height - 150) / maxDepth;
+    const verticalSpacing = Math.min((height - 150) / maxDepth, 100); // capped vertical spacing
 
     treeLayout.size([horizontalSpacing * maxChildren, verticalSpacing * maxDepth]);
 
@@ -126,19 +126,12 @@ function update(source) {
 
     nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
 
-    // Root pulsing slower
+    // Root subtle pulse only once on load
     svg.selectAll("circle").filter(d => d && d.depth === 0)
-        .transition().duration(4000)
-        .attrTween("r", function(d) {
-            const r = nodeRadius*1.5;
-            return t => r + 3 * Math.sin(t * Math.PI * 2);
-        })
-        .on("end", function() {
-            d3.select(this).call(d => d.transition().duration(4000).attrTween("r", function(d) {
-                const r = nodeRadius*1.5;
-                return t => r + 3 * Math.sin(t * Math.PI * 2);
-            }).on("end", arguments.callee));
-        });
+        .transition().duration(1000)
+        .attr("r", nodeRadius*1.6)
+        .transition().duration(1000)
+        .attr("r", nodeRadius*1.5);
 }
 
 // Diagonal function
