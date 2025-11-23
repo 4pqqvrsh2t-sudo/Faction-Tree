@@ -1,10 +1,8 @@
-// Responsive vertical tree with collapsed nodes for mobile and Chromebook
 const container = document.getElementById("tree-container");
 
 let width = container.clientWidth;
 let height = container.clientHeight;
 
-// SVG container
 const svg = d3.select("#tree-container")
     .append("svg")
     .attr("width", "100%")
@@ -17,7 +15,7 @@ const svg = d3.select("#tree-container")
     );
 
 const g = svg.append("g")
-    .attr("transform", `translate(${width / 2}, 50)`); // root near top
+    .attr("transform", `translate(${width / 2}, 50)`);
 
 // Sample tree data
 const data = {
@@ -33,9 +31,9 @@ const root = d3.hierarchy(data);
 root.x0 = width / 2;
 root.y0 = 0;
 
-// COLLAPSE ALL except root
+// Collapse all except root
 function collapseAll(d) {
-    if (d.children) {
+    if(d.children) {
         d._children = d.children;
         d._children.forEach(collapseAll);
         d.children = null;
@@ -50,12 +48,16 @@ update(root);
 
 // Click to expand/collapse
 function click(event, d) {
-    if(d.children) { d._children = d.children; d.children = null; }
-    else { d.children = d._children; d._children = null; }
+    if(d.children) {
+        collapseAll(d);
+        d.children = null;
+    } else {
+        d.children = d._children;
+        d._children = null;
+    }
     update(d);
 }
 
-// Update function
 function update(source) {
     treeLayout.size([getHorizontalSpacing(), getVerticalSpacing()]);
     const treeData = treeLayout(root);
@@ -74,7 +76,7 @@ function update(source) {
         .style("fill", d => d.depth === 0 ? "orange" : "#fff")
         .style("stroke", "#f90")
         .style("stroke-width", d => d.depth === 0 ? 4 : 2)
-        .transition().duration(800)
+        .transition().duration(1500) // slower expansion
         .attr("r", d => d.depth === 0 ? 20 : 10);
 
     nodeEnter.append("text")
@@ -85,7 +87,7 @@ function update(source) {
         .style("fill", "#fff")
         .style("font-size", width < 500 ? "10px" : "14px")
         .style("opacity", 0)
-        .transition().duration(800)
+        .transition().duration(1500)
         .style("opacity", 1);
 
     // Links
@@ -99,25 +101,25 @@ function update(source) {
             const o = { x: source.x0, y: source.y0 };
             return diagonal(o, o);
         })
-        .transition().duration(800)
+        .transition().duration(1500)
         .attr("d", d => diagonal(d.source, d.target));
 
-    // Transition nodes and links
-    const t = d3.transition().duration(800);
+    // Merge and transition
+    const t = d3.transition().duration(1500);
     node.merge(nodeEnter).transition(t).attr("transform", d => `translate(${d.x},${d.y})`);
     link.merge(link.enter()).transition(t).attr("d", d => diagonal(d.source, d.target));
 
     nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
 
-    // Pulsing root
+    // Slower pulsing root
     svg.selectAll("circle").filter(d => d && d.depth === 0)
-        .transition().duration(1000)
+        .transition().duration(3000)
         .attrTween("r", function(d) {
             const r = 20;
             return t => r + 3 * Math.sin(t * Math.PI * 2);
         })
         .on("end", function() {
-            d3.select(this).call(d => d.transition().duration(1000).attrTween("r", function(d) {
+            d3.select(this).call(d => d.transition().duration(3000).attrTween("r", function(d) {
                 const r = 20;
                 return t => r + 3 * Math.sin(t * Math.PI * 2);
             }).on("end", arguments.callee));
@@ -136,14 +138,14 @@ window.addEventListener("resize", () => {
     update(root);
 });
 
-// Adaptive horizontal spacing
+// Horizontal spacing
 function getHorizontalSpacing() {
-    if (width < 400) return 80;  // small phones
-    if (width < 700) return 150; // tablets / narrow screens
-    return 250;                  // desktops / Chromebook
+    if (width < 400) return 50;  // small phones
+    if (width < 700) return 120; // tablets
+    return 180;                  // Chromebook / desktop
 }
 
-// Adaptive vertical spacing
+// Vertical spacing
 function getVerticalSpacing() {
     const levels = root.height + 1;
     return (height - 150) / levels * levels;
