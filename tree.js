@@ -3,6 +3,7 @@ const container = document.getElementById("tree-container");
 let width = container.clientWidth;
 let height = container.clientHeight;
 
+// SVG container
 const svg = d3.select("#tree-container")
     .append("svg")
     .attr("width", "100%")
@@ -31,7 +32,7 @@ const root = d3.hierarchy(data);
 root.x0 = width / 2;
 root.y0 = 0;
 
-// Collapse all except root
+// Collapse all descendants
 function collapseAll(d) {
     if(d.children) {
         d._children = d.children;
@@ -41,12 +42,16 @@ function collapseAll(d) {
 }
 collapseAll(root);
 
+const initialScale = width < 500 ? 0.7 : 1;
+
 // Tree layout
-let treeLayout = d3.tree().size([getHorizontalSpacing(), getVerticalSpacing()]);
+let treeLayout = d3.tree();
 
+// Initial render
 update(root);
+centerTree();
 
-// Click to expand/collapse
+// Click to expand/collapse recursively
 function click(event, d) {
     if(d.children) {
         collapseAll(d);
@@ -56,13 +61,24 @@ function click(event, d) {
         d._children = null;
     }
     update(d);
+    centerTree();
 }
 
+// Main update function
 function update(source) {
-    treeLayout.size([getHorizontalSpacing(), getVerticalSpacing()]);
+    const maxDepth = root.height + 1;
+    const maxChildren = getMaxChildren(root);
+    const horizontalSpacing = Math.min(150, width / (maxChildren + 1));
+    const verticalSpacing = (height - 150) / maxDepth;
+
+    treeLayout.size([horizontalSpacing * maxChildren, verticalSpacing * maxDepth]);
+
     const treeData = treeLayout(root);
     const nodes = treeData.descendants();
     const links = treeData.links();
+
+    const nodeRadius = width < 400 ? 12 : width < 700 ? 15 : 20;
+    const fontSize = width < 400 ? "10px" : width < 700 ? "12px" : "14px";
 
     // Nodes
     const node = g.selectAll(".node").data(nodes, d => d.data.name);
@@ -76,8 +92,8 @@ function update(source) {
         .style("fill", d => d.depth === 0 ? "orange" : "#fff")
         .style("stroke", "#f90")
         .style("stroke-width", d => d.depth === 0 ? 4 : 2)
-        .transition().duration(1500) // slower expansion
-        .attr("r", d => d.depth === 0 ? 20 : 10);
+        .transition().duration(1800)
+        .attr("r", d => d.depth === 0 ? nodeRadius * 1.5 : nodeRadius);
 
     nodeEnter.append("text")
         .attr("dy", ".35em")
@@ -85,9 +101,9 @@ function update(source) {
         .attr("text-anchor", d => d.children || d._children ? "end" : "start")
         .text(d => d.data.name)
         .style("fill", "#fff")
-        .style("font-size", width < 500 ? "10px" : "14px")
+        .style("font-size", fontSize)
         .style("opacity", 0)
-        .transition().duration(1500)
+        .transition().duration(1800)
         .style("opacity", 1);
 
     // Links
@@ -101,52 +117,73 @@ function update(source) {
             const o = { x: source.x0, y: source.y0 };
             return diagonal(o, o);
         })
-        .transition().duration(1500)
+        .transition().duration(1800)
         .attr("d", d => diagonal(d.source, d.target));
 
-    // Merge and transition
-    const t = d3.transition().duration(1500);
+    const t = d3.transition().duration(1800);
     node.merge(nodeEnter).transition(t).attr("transform", d => `translate(${d.x},${d.y})`);
     link.merge(link.enter()).transition(t).attr("d", d => diagonal(d.source, d.target));
 
     nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
 
-    // Slower pulsing root
+    // Root pulsing slower
     svg.selectAll("circle").filter(d => d && d.depth === 0)
-        .transition().duration(3000)
+        .transition().duration(4000)
         .attrTween("r", function(d) {
-            const r = 20;
+            const r = nodeRadius*1.5;
             return t => r + 3 * Math.sin(t * Math.PI * 2);
         })
         .on("end", function() {
-            d3.select(this).call(d => d.transition().duration(3000).attrTween("r", function(d) {
-                const r = 20;
+            d3.select(this).call(d => d.transition().duration(4000).attrTween("r", function(d) {
+                const r = nodeRadius*1.5;
                 return t => r + 3 * Math.sin(t * Math.PI * 2);
             }).on("end", arguments.callee));
         });
 }
 
-// Diagonal function for links
+// Diagonal function
 function diagonal(s, d) {
     return `M ${s.x} ${s.y} C ${s.x} ${(s.y + d.y)/2}, ${d.x} ${(s.y + d.y)/2}, ${d.x} ${d.y}`;
 }
 
-// Responsive resize
+// Calculate maximum children recursively
+function getMaxChildren(d) {
+    let max = d.children ? d.children.length : 0;
+    if(d.children) d.children.forEach(c => { max = Math.max(max, getMaxChildren(c)); });
+    if(d._children) d._children.forEach(c => { max = Math.max(max, getMaxChildren(c)); });
+    return max;
+}
+
+// Center the tree after update
+function centerTree() {
+    const nodes = g.selectAll(".node").nodes();
+    if(nodes.length === 0) return;
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    nodes.forEach(n => {
+        const bbox = n.getBBox();
+        const x = n.getCTM().e + bbox.x + bbox.width/2;
+        const y = n.getCTM().f + bbox.y + bbox.height/2;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+    });
+
+    const treeWidth = maxX - minX;
+    const treeHeight = maxY - minY;
+
+    const offsetX = (width - treeWidth) / 2 - minX;
+    const offsetY = (height - treeHeight) / 2 - minY;
+
+    g.transition().duration(800)
+        .attr("transform", `translate(${offsetX + width/2}, ${offsetY + 50}) scale(${initialScale})`);
+}
+
+// Responsive
 window.addEventListener("resize", () => {
     width = container.clientWidth;
     height = container.clientHeight;
     update(root);
+    centerTree();
 });
-
-// Horizontal spacing
-function getHorizontalSpacing() {
-    if (width < 400) return 50;  // small phones
-    if (width < 700) return 120; // tablets
-    return 180;                  // Chromebook / desktop
-}
-
-// Vertical spacing
-function getVerticalSpacing() {
-    const levels = root.height + 1;
-    return (height - 150) / levels * levels;
-}
