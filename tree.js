@@ -14,7 +14,7 @@ const svg = d3.select("#tree-container")
   );
 
 const g = svg.append("g")
-  .attr("transform", `translate(${width/2}, 50)`);
+  .attr("transform", `translate(${width/2}, 80)`);
 
 // Tree data
 const data = {
@@ -42,7 +42,7 @@ const root = d3.hierarchy(data);
 root.x0 = width / 2;
 root.y0 = 0;
 
-// Collapse children on load
+// Collapse all except root
 root.children.forEach(collapse);
 
 function collapse(d) {
@@ -54,10 +54,11 @@ function collapse(d) {
 }
 
 // Tree layout top-down
-const treeLayout = d3.tree().nodeSize([100, 120]);
+const treeLayout = d3.tree().nodeSize([120, 150]);
 
 update(root);
 
+// Click to expand/collapse & open link
 function click(event, d) {
   if(d.children) {
     d._children = d.children;
@@ -73,7 +74,7 @@ function click(event, d) {
   }
 }
 
-// Main update function
+// Main update
 function update(source) {
   const treeData = treeLayout(root);
   const nodes = treeData.descendants();
@@ -90,6 +91,7 @@ function update(source) {
 
   nodeEnter.append("circle")
     .attr("r", 0)
+    .attr("class", d => d.depth === 0 ? "glow" : "")
     .transition().duration(600)
     .attr("r", 20);
 
