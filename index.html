@@ -1,29 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Faction Tree</title>
-    <style>
-        body {
-            background-color: #000;
-            color: #fff;
-            margin: 0;
-            overflow: hidden;
-        }
-        text {
-            font-family: Arial, sans-serif;
-            font-size: 14px;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Faction Tree</title>
+<style>
+  body {
+    margin: 0;
+    background: #111;
+    color: #fff;
+    font-family: sans-serif;
+    overflow: hidden;
+  }
+  svg {
+    width: 100%;
+    height: 100vh;
+  }
+  .node circle {
+    fill: #fff;
+    stroke: orange;
+    stroke-width: 3px;
+    cursor: pointer;
+  }
+  .node text {
+    fill: #fff;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .link {
+    fill: none;
+    stroke: #888;
+    stroke-width: 2px;
+  }
+</style>
 </head>
 <body>
-    <!-- Container for the tree -->
-    <div id="tree-container" style="width:100%; height:100vh;"></div>
+<div id="tree-container"></div>
 
-    <!-- D3.js library -->
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-
-    <!-- Your tree JS -->
-    <script src="tree.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="tree.js"></script>
 </body>
 </html>

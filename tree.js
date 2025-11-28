@@ -1,155 +1,141 @@
-// ----- TREE.JS -----
 const container = document.getElementById("tree-container");
-
 let width = container.clientWidth;
 let height = container.clientHeight;
 
-// SVG container
+// SVG setup
 const svg = d3.select("#tree-container")
-    .append("svg")
-    .attr("width","100%")
-    .attr("height","100%")
-    .call(d3.zoom()
-        .scaleExtent([0.6,1.5])
-        .on("zoom", (event) => g.attr("transform", event.transform))
-    );
+  .append("svg")
+  .attr("width", "100%")
+  .attr("height", "100%")
+  .attr("viewBox", `0 0 ${width} ${height}`)
+  .call(d3.zoom()
+    .scaleExtent([0.5, 2])
+    .on("zoom", (event) => g.attr("transform", event.transform))
+  );
 
-const g = svg.append("g");
+const g = svg.append("g")
+  .attr("transform", `translate(${width/2}, 50)`);
 
-// SAMPLE DATA
+// Tree data
 const data = {
-    name:"Federation",
-    children:[
-        {name:"Faction A", children:[{name:"Faction A1"},{name:"Faction A2"}]},
-        {name:"Faction B"},
-        {name:"Faction C", children:[{name:"Faction C1"}]}
-    ]
+  name: "The Federation",
+  link: "federation.html",
+  children: [
+    {
+      name: "The Polar Domain",
+      link: "polar-domain.html",
+      children: [
+        {
+          name: "The Luminara Consortium",
+          link: "luminara.html",
+          children: [
+            { name: "Workers Union", link: "workers.html" },
+            { name: "Hidden Faction", link: "hidden.html" }
+          ]
+        }
+      ]
+    }
+  ]
 };
 
 const root = d3.hierarchy(data);
 root.x0 = width / 2;
 root.y0 = 0;
 
-// Collapse all children initially
-root.children?.forEach(collapse);
-function collapse(d){
-    if(d.children){
-        d._children = d.children;
-        d._children.forEach(collapse);
-        d.children = null;
-    }
+// Collapse children on load
+root.children.forEach(collapse);
+
+function collapse(d) {
+  if(d.children) {
+    d._children = d.children;
+    d._children.forEach(collapse);
+    d.children = null;
+  }
 }
 
-const treeLayout = d3.tree().nodeSize([100, 80]); // vertical spacing reduced for mobile
+// Tree layout top-down
+const treeLayout = d3.tree().nodeSize([100, 120]);
 
-// Initial render
 update(root);
-centerTree();
 
-// Click handler: expand/collapse
-function click(event,d){
-    if(d.children){
-        d._children = d.children;
-        d.children = null;
-    } else {
-        d.children = d._children;
-        d._children = null;
-    }
-    update(d);
-    centerTree();
+function click(event, d) {
+  if(d.children) {
+    d._children = d.children;
+    d.children = null;
+  } else {
+    d.children = d._children;
+    d._children = null;
+  }
+  update(d);
+
+  if(d.data.link) {
+    window.open(d.data.link, "_blank");
+  }
 }
 
-// Update function
-function update(source){
-    const treeData = treeLayout(root);
-    const nodes = treeData.descendants();
-    const links = treeData.links();
+// Main update function
+function update(source) {
+  const treeData = treeLayout(root);
+  const nodes = treeData.descendants();
+  const links = treeData.links();
 
-    const nodeRadius = width < 500 ? 12 : 15;
-    const fontSize = width < 500 ? 10 : 12;
+  // Nodes
+  const node = g.selectAll(".node")
+    .data(nodes, d => d.data.name);
 
-    // NODES
-    const node = g.selectAll(".node").data(nodes, d=>d.data.name);
-    const nodeEnter = node.enter().append("g")
-        .attr("class","node")
-        .attr("transform", d=>`translate(${source.x0},${source.y0})`)
-        .on("click", click);
+  const nodeEnter = node.enter().append("g")
+    .attr("class", "node")
+    .attr("transform", d => `translate(${source.x0},${source.y0})`)
+    .on("click", click);
 
-    nodeEnter.append("circle")
-        .attr("r",0)
-        .style("fill", d=>d._children?"#f90":"#fff")
-        .style("stroke","#f90")
-        .style("stroke-width",2)
-        .transition().duration(800) // slower animation
-        .attr("r", nodeRadius);
+  nodeEnter.append("circle")
+    .attr("r", 0)
+    .transition().duration(600)
+    .attr("r", 20);
 
-    nodeEnter.append("text")
-        .attr("dy",".35em")
-        .attr("x", d=>d._children?-20:20)
-        .attr("text-anchor", d=>d._children?"end":"start")
-        .text(d=>d.data.name)
-        .style("fill","#fff")
-        .style("font-size", fontSize + "px")
-        .style("opacity",0)
-        .transition().duration(800)
-        .style("opacity",1);
+  nodeEnter.append("text")
+    .attr("dy", ".35em")
+    .attr("x", 0)
+    .attr("y", -30)
+    .attr("text-anchor", "middle")
+    .text(d => d.data.name)
+    .style("opacity", 0)
+    .transition().duration(600)
+    .style("opacity", 1);
 
-    // LINKS
-    const link = g.selectAll(".link").data(links, d=>d.target.data.name);
-    link.enter().insert("path","g")
-        .attr("class","link")
-        .attr("fill","none")
-        .attr("stroke","#888")
-        .attr("stroke-width",2)
-        .attr("d", d=>`M${source.x0},${source.y0} C${source.x0},${source.y0} ${source.x0},${source.y0} ${source.x0},${source.y0}`)
-        .transition().duration(800)
-        .attr("d", d=>diagonal(d));
+  node.merge(nodeEnter)
+    .transition().duration(600)
+    .attr("transform", d => `translate(${d.x},${d.y})`);
 
-    // TRANSITION TO NEW POSITIONS
-    const t = d3.transition().duration(800);
-    node.merge(nodeEnter).transition(t)
-        .attr("transform", d=>`translate(${d.x},${d.y})`);
-    link.merge(link.enter()).transition(t)
-        .attr("d", d=>diagonal(d));
+  // Links
+  const link = g.selectAll(".link")
+    .data(links, d => d.target.data.name);
 
-    nodes.forEach(d=>{ d.x0=d.x; d.y0=d.y; });
+  link.enter().insert("path", "g")
+    .attr("class", "link")
+    .attr("d", d => {
+      const o = { x: source.x0, y: source.y0 };
+      return diagonal(o, o);
+    })
+    .transition().duration(600)
+    .attr("d", d => diagonal(d.source, d.target));
+
+  link.merge(link.enter())
+    .transition().duration(600)
+    .attr("d", d => diagonal(d.source, d.target));
+
+  nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
 }
 
-// Diagonal generator
-function diagonal(d){
-    return `M${d.source.x},${d.source.y} C${d.source.x},${(d.source.y+d.target.y)/2} ${d.target.x},${(d.source.y+d.target.y)/2} ${d.target.x},${d.target.y}`;
+// Diagonal for top-down
+function diagonal(s, d) {
+  return `M ${s.x} ${s.y} C ${s.x} ${(s.y + d.y)/2}, ${d.x} ${(s.y + d.y)/2}, ${d.x} ${d.y}`;
 }
 
-// CENTER TREE
-function centerTree(){
-    const nodes = g.selectAll(".node").nodes();
-    if(nodes.length===0) return;
-
-    let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
-    nodes.forEach(n=>{
-        const bbox = n.getBBox();
-        const x = n.getCTM().e + bbox.x + bbox.width/2;
-        const y = n.getCTM().f + bbox.y + bbox.height/2;
-        minX = Math.min(minX,x);
-        maxX = Math.max(maxX,x);
-        minY = Math.min(minY,y);
-        maxY = Math.max(maxY,y);
-    });
-
-    const treeWidth = maxX - minX;
-    const treeHeight = maxY - minY;
-
-    const offsetX = (width - treeWidth)/2 - minX;
-    const offsetY = (height - treeHeight)/2 - minY;
-
-    g.transition().duration(800)
-        .attr("transform",`translate(${offsetX},${offsetY}) scale(1)`);
-}
-
-// RESIZE HANDLER
-window.addEventListener("resize", ()=>{
-    width = container.clientWidth;
-    height = container.clientHeight;
-    update(root);
-    centerTree();
+// Responsive
+window.addEventListener("resize", () => {
+  width = container.clientWidth;
+  height = container.clientHeight;
+  svg.attr("viewBox", `0 0 ${width} ${height}`);
+  update(root);
 });
