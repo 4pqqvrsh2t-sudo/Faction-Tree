@@ -1,3 +1,5 @@
+window.addEventListener("DOMContentLoaded", () => {
+
 const container = document.getElementById("tree-container");
 let width = container.clientWidth;
 let height = container.clientHeight;
@@ -43,7 +45,7 @@ root.x0 = width / 2;
 root.y0 = 0;
 
 // Collapse all except root
-root.children.forEach(collapse);
+if (root.children) root.children.forEach(collapse);
 
 function collapse(d) {
   if(d.children) {
@@ -53,12 +55,12 @@ function collapse(d) {
   }
 }
 
-// Tree layout top-down
+// Tree layout
 const treeLayout = d3.tree().nodeSize([120, 150]);
 
 update(root);
 
-// Click to expand/collapse & open link
+// Click to expand/collapse and open link
 function click(event, d) {
   if(d.children) {
     d._children = d.children;
@@ -100,8 +102,8 @@ function update(source) {
     .attr("x", 0)
     .attr("y", -30)
     .attr("text-anchor", "middle")
-    .text(d => d.data.name)
     .style("opacity", 0)
+    .text(d => d.data.name)
     .transition().duration(600)
     .style("opacity", 1);
 
@@ -129,7 +131,6 @@ function update(source) {
   nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
 }
 
-// Diagonal for top-down
 function diagonal(s, d) {
   return `M ${s.x} ${s.y} C ${s.x} ${(s.y + d.y)/2}, ${d.x} ${(s.y + d.y)/2}, ${d.x} ${d.y}`;
 }
@@ -141,3 +142,5 @@ window.addEventListener("resize", () => {
   svg.attr("viewBox", `0 0 ${width} ${height}`);
   update(root);
 });
+
+}); // END DOMContentLoaded
